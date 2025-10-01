@@ -53,7 +53,7 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --add-data "esaf_config_defaults.json;." autopilot.py
+        pyinstaller --onefile --add-data "esaf_config_defaults.json;." autopilot.py
 
     - name: Verify .exe was built
       run: |
