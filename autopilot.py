@@ -7,6 +7,7 @@ import keyboard
 from colorama import Fore, Style, init
 import pyautogui
 import tempfile
+import time
 
 # Initialize colorama with full compatibility
 init(autoreset=True, convert=True, strip=False)
@@ -49,13 +50,20 @@ def get_resource_path(relative_path):
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
+        print(f"{Fore.GREEN}[DEBUG] Running in PyInstaller bundle, base path: {base_path}")
     except Exception:
         base_path = os.path.abspath(".")
+        print(f"{Fore.YELLOW}[DEBUG] Running in development, base path: {base_path}")
     
-    return os.path.join(base_path, relative_path)
+    path = os.path.join(base_path, relative_path)
+    print(f"{Fore.CYAN}[DEBUG] Resolved path for {relative_path}: {path}")
+    print(f"{Fore.CYAN}[DEBUG] Path exists: {os.path.exists(path)}")
+    
+    return path
 
 def extract_and_run_script(script_name, step_name):
     """Extract script from bundle to temporary file and run it in a subprocess"""
+    temp_dir = None
     try:
         print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
         print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
@@ -65,23 +73,34 @@ def extract_and_run_script(script_name, step_name):
         
         if not os.path.exists(bundled_path):
             print(f"{Fore.RED}[ERROR] Script not found in bundle: {script_name}")
+            print(f"{Fore.RED}[DEBUG] Current directory: {os.getcwd()}")
+            print(f"{Fore.RED}[DEBUG] Directory contents: {os.listdir('.')}")
             return False
+        
+        print(f"{Fore.GREEN}[DEBUG] Found script: {bundled_path}")
         
         # Read the script content
         with open(bundled_path, 'r', encoding='utf-8') as f:
             script_content = f.read()
         
         # Create temporary directory and file
-        temp_dir = tempfile.mkdtemp()
+        temp_dir = tempfile.mkdtemp(prefix="esaf_")
         temp_script_path = os.path.join(temp_dir, script_name)
         
         # Write the original script content to temporary file
         with open(temp_script_path, 'w', encoding='utf-8') as f:
             f.write(script_content)
         
-        print(f"{Fore.GREEN}[DEBUG] Extracted {script_name} to temporary location")
+        print(f"{Fore.GREEN}[DEBUG] Extracted {script_name} to: {temp_script_path}")
         
-        # Run the script in a subprocess
+        # Set up environment for subprocess
+        env = os.environ.copy()
+        env['PYTHONPATH'] = os.pathsep.join(sys.path)
+        
+        print(f"{Fore.CYAN}[OUTPUT] Starting {step_name} output:")
+        print(f"{Fore.CYAN}=" * 60)
+        
+        # Run the script in a subprocess with proper environment
         proc = subprocess.Popen(
             [sys.executable, temp_script_path],
             stdout=subprocess.PIPE,
@@ -90,46 +109,52 @@ def extract_and_run_script(script_name, step_name):
             bufsize=1,
             universal_newlines=True,
             encoding='utf-8',
-            errors='replace'
+            errors='replace',
+            env=env
         )
         
-        # Stream output with real-time monitoring for abort
-        import threading
-        import time
+        # Stream output with real-time abort checking
+        abort_requested = False
         
-        def monitor_abort():
-            while proc.poll() is None:
-                try:
-                    if keyboard.is_pressed('esc'):
-                        print(f"\n{Fore.RED}[ABORT] EMERGENCY STOP: ESC key pressed!")
-                        proc.terminate()
-                        break
-                    time.sleep(0.1)
-                except:
-                    break
-        
-        # Start abort monitor thread
-        abort_thread = threading.Thread(target=monitor_abort, daemon=True)
-        abort_thread.start()
-        
-        # Stream output
         while True:
+            # Check for abort
+            if keyboard.is_pressed('esc'):
+                print(f"\n{Fore.RED}[ABORT] EMERGENCY STOP: ESC key pressed!")
+                abort_requested = True
+                proc.terminate()
+                break
+                
+            # Read output
             output = proc.stdout.readline()
             if output == '' and proc.poll() is not None:
                 break
             if output:
-                print(output, end='', flush=True)
+                clean_output = output.replace('\x00', '').strip()
+                if clean_output:
+                    print(clean_output)
+            
+            time.sleep(0.01)  # Small delay to prevent CPU overload
         
         # Wait for process to complete
+        if not abort_requested:
+            proc.wait()
+        
         rc = proc.poll()
         
-        # Clean up temporary directory
-        try:
-            shutil.rmtree(temp_dir)
-        except:
-            pass
+        print(f"{Fore.CYAN}=" * 60)
         
-        if rc == 0:
+        # Clean up temporary directory
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+                print(f"{Fore.GREEN}[DEBUG] Cleaned up temporary directory")
+            except Exception as e:
+                print(f"{Fore.YELLOW}[WARN] Could not clean up temp dir: {e}")
+        
+        if abort_requested:
+            print(f"\n{Fore.RED}[ABORT] {step_name} was stopped by user")
+            return False
+        elif rc == 0:
             print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
             return True
         else:
@@ -142,27 +167,23 @@ def extract_and_run_script(script_name, step_name):
             proc.terminate()
             proc.wait()
         # Clean up temporary directory
-        try:
-            if 'temp_dir' in locals():
+        if temp_dir and os.path.exists(temp_dir):
+            try:
                 shutil.rmtree(temp_dir)
-        except:
-            pass
+            except:
+                pass
         return False
     except Exception as e:
-        print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {e}")
+        print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         # Clean up temporary directory
-        try:
-            if 'temp_dir' in locals():
+        if temp_dir and os.path.exists(temp_dir):
+            try:
                 shutil.rmtree(temp_dir)
-        except:
-            pass
+            except:
+                pass
         return False
-
-def check_abort():
-    """Check if user pressed ESC - can be called anywhere"""
-    if keyboard.is_pressed('esc'):
-        print(f"\n{Fore.RED}[ABORT] EMERGENCY STOP: ESC key pressed!")
-        raise KeyboardInterrupt("User pressed ESC")
 
 def ensure_defaults():
     """Create defaults file if it doesn't exist"""
