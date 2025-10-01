@@ -7,6 +7,7 @@ import keyboard
 from colorama import Fore, Style, init
 import pyautogui
 import tempfile
+import importlib.util
 
 # Initialize colorama with full compatibility
 init(autoreset=True, convert=True, strip=False)
@@ -25,9 +26,8 @@ SCRIPTS = {
     "complete": "complete_process.py"
 }
 
-
 def get_ascii_banner():
-    """Return ASCII banner as plain string (no Unicode, safe for all terminals)"""
+    """Return ASCII banner as plain string (safe for all terminals)"""
     return f"""
 {Fore.CYAN}+==============================================================================+
 {Fore.CYAN}|                                                                              |
@@ -55,55 +55,109 @@ def get_resource_path(relative_path):
     
     return os.path.join(base_path, relative_path)
 
-def extract_and_run_script(script_name, step_name):
-    """Extract script from bundled resources and run it"""
+def extract_script_to_temp(script_name):
+    """Extract script from bundle to temporary file and return path"""
     try:
-        # Get the bundled script path
-        script_path = get_resource_path(script_name)
+        # Get the bundled script
+        bundled_path = get_resource_path(script_name)
         
-        if not os.path.exists(script_path):
+        if not os.path.exists(bundled_path):
             print(f"{Fore.RED}[ERROR] Script not found in bundle: {script_name}")
-            return False
-            
+            return None
+        
+        # Read the script content
+        with open(bundled_path, 'r', encoding='utf-8') as f:
+            script_content = f.read()
+        
+        # Create temporary file
+        temp_dir = tempfile.mkdtemp()
+        temp_script_path = os.path.join(temp_dir, script_name)
+        
+        # Write script to temporary file
+        with open(temp_script_path, 'w', encoding='utf-8') as f:
+            f.write(script_content)
+        
+        return temp_script_path
+        
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Failed to extract script: {e}")
+        return None
+
+def run_script_directly(script_name, step_name):
+    """Run script directly without creating new process"""
+    try:
         print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
         print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
         
-        # Run the script
-        proc = subprocess.Popen(
-            [sys.executable, script_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True,
-            encoding='utf-8',
-            errors='replace'
-        )
-        
-        while True:
-            check_abort()
-            output = proc.stdout.readline()
-            if output == '' and proc.poll() is not None:
-                break
-            if output:
-                print(output.strip())
-                
-        rc = proc.poll()
-        if rc == 0:
-            print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
-            return True
-        else:
-            print(f"\n{Fore.RED}[FAILED] {step_name} exited with code {rc}")
+        # Extract script to temp file
+        script_path = extract_script_to_temp(script_name)
+        if not script_path:
             return False
+        
+        # Read and execute the script
+        with open(script_path, 'r', encoding='utf-8') as f:
+            script_code = f.read()
+        
+        # Create a temporary module and execute it
+        temp_module_name = f"temp_{script_name.replace('.', '_')}"
+        spec = importlib.util.spec_from_loader(temp_module_name, loader=None)
+        temp_module = importlib.util.module_from_spec(spec)
+        
+        # Set up the environment for the script
+        script_globals = {
+            '__name__': '__main__',
+            '__file__': script_path,
+            'sys': sys,
+            'os': os,
+            'json': json,
+            'shutil': shutil,
+            'keyboard': keyboard,
+            'Fore': Fore,
+            'Style': Style,
+            'init': init,
+            'pyautogui': pyautogui,
+            'pd': None,  # pandas
+            'load_workbook': None,  # openpyxl
+            'px': None,  # plotly express
+            'go': None,  # plotly graph_objects
+            'pio': None,  # plotly io
+            'subprocess': subprocess
+        }
+        
+        # Try to import required modules for the script
+        try:
+            import pandas as pd
+            script_globals['pd'] = pd
+        except ImportError:
+            pass
             
+        try:
+            from openpyxl import load_workbook
+            script_globals['load_workbook'] = load_workbook
+        except ImportError:
+            pass
+            
+        try:
+            import plotly.express as px
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            script_globals['px'] = px
+            script_globals['go'] = go
+            script_globals['pio'] = pio
+        except ImportError:
+            pass
+        
+        # Execute the script
+        exec(script_code, script_globals)
+        
+        print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
+        return True
+        
     except KeyboardInterrupt:
         print(f"\n{Fore.RED}[ABORT] Process interrupted by user.")
-        if 'proc' in locals():
-            proc.terminate()
-            proc.wait()
         return False
     except Exception as e:
-        print(f"\n{Fore.RED}[ERROR] Unexpected error: {e}")
+        print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {e}")
         return False
 
 def check_abort():
@@ -423,17 +477,17 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                extract_and_run_script(SCRIPTS["complete"], "Full End-to-End Process")
+                run_script_directly(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
-                extract_and_run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
+                run_script_directly(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
             elif choice == "4":
-                extract_and_run_script(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
+                run_script_directly(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
             elif choice == "5":
-                extract_and_run_script(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
+                run_script_directly(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
             elif choice == "6":
-                extract_and_run_script(SCRIPTS["step4"], "Step 4: Summary + Pivot")
+                run_script_directly(SCRIPTS["step4"], "Step 4: Summary + Pivot")
             elif choice == "7":
-                extract_and_run_script(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
+                run_script_directly(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
             elif choice == "0":
                 print(f"\n{Fore.CYAN}Thank you for using ESAF AutoPilot™. Goodbye!")
                 break
@@ -456,3 +510,6 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding='utf-8')
     init(autoreset=True, convert=True, strip=False)
     main()
+
+
+ 
