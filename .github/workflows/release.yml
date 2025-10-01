@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
 
     - name: Read VERSION file
       id: get_version
@@ -33,20 +33,8 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --onefile --windowed ^
-          --add-data "esaf_config_defaults.json;." ^
-          --hidden-import=pandas ^
-          --hidden-import=openpyxl ^
-          --hidden-import=xlrd ^
-          --hidden-import=plotly ^
-          --hidden-import=pyautogui ^
-          --hidden-import=pyperclip ^
-          --hidden-import=pygetwindow ^
-          --hidden-import=PIL ^
-          --hidden-import=keyboard ^
-          --hidden-import=colorama ^
-          --hidden-import=cv2 ^
-          autopilot.py
+        pyi-makespec --onefile --windowed --add-data "esaf_config_defaults.json;." autopilot.py
+        pyinstaller autopilot.spec
 
     - name: Verify .exe was built
       run: |
@@ -71,7 +59,7 @@ jobs:
       id: create_release
       uses: softprops/action-gh-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ steps.get_version.outputs.VERSION }}
         name: Release v${{ steps.get_version.outputs.VERSION }}
@@ -87,7 +75,11 @@ jobs:
         draft: true
 
     - name: Upload Release Asset
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: release-asset
-        path: dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+        asset_name: esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+        asset_content_type: application/octet-stream
