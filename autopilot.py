@@ -6,6 +6,7 @@ import shutil
 import keyboard
 from colorama import Fore, Style, init
 import pyautogui
+import tempfile
 
 # Initialize colorama with full compatibility
 init(autoreset=True, convert=True, strip=False)
@@ -23,6 +24,7 @@ SCRIPTS = {
     "step5": "Interactive_Dashboard.py",
     "complete": "complete_process.py"
 }
+
 
 def get_ascii_banner():
     """Return ASCII banner as plain string (no Unicode, safe for all terminals)"""
@@ -43,26 +45,66 @@ def get_ascii_banner():
 {Fore.CYAN}+==============================================================================+
 """
 
-def get_script_path(script_name):
-    """Get the correct path for scripts - works for both .py and .exe"""
-    # If running as .exe, check if script is in same directory
-    if getattr(sys, 'frozen', False):
-        # We're running as .exe
-        base_dir = os.path.dirname(sys.executable)
-        script_path = os.path.join(base_dir, script_name)
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
+
+def extract_and_run_script(script_name, step_name):
+    """Extract script from bundled resources and run it"""
+    try:
+        # Get the bundled script path
+        script_path = get_resource_path(script_name)
         
-        # Check if script exists as .py file
-        if os.path.exists(script_path):
-            return script_path
-        # Check if script exists as .exe file (if other scripts are also compiled)
-        script_exe = script_name.replace('.py', '.exe')
-        script_exe_path = os.path.join(base_dir, script_exe)
-        if os.path.exists(script_exe_path):
-            return script_exe_path
-        return None
-    else:
-        # Running as .py script
-        return script_name
+        if not os.path.exists(script_path):
+            print(f"{Fore.RED}[ERROR] Script not found in bundle: {script_name}")
+            return False
+            
+        print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
+        print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
+        
+        # Run the script
+        proc = subprocess.Popen(
+            [sys.executable, script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        
+        while True:
+            check_abort()
+            output = proc.stdout.readline()
+            if output == '' and proc.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+                
+        rc = proc.poll()
+        if rc == 0:
+            print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
+            return True
+        else:
+            print(f"\n{Fore.RED}[FAILED] {step_name} exited with code {rc}")
+            return False
+            
+    except KeyboardInterrupt:
+        print(f"\n{Fore.RED}[ABORT] Process interrupted by user.")
+        if 'proc' in locals():
+            proc.terminate()
+            proc.wait()
+        return False
+    except Exception as e:
+        print(f"\n{Fore.RED}[ERROR] Unexpected error: {e}")
+        return False
 
 def check_abort():
     """Check if user pressed ESC - can be called anywhere"""
@@ -291,71 +333,6 @@ def view_config(config):
     print(f"\n{Fore.CYAN}[CONFIG] CURRENT CONFIGURATION:")
     print(json.dumps(config, indent=2, ensure_ascii=False))
 
-def run_script(script_name, step_name):
-    """Run script with ESC monitoring and live output - FIXED for .exe deployment"""
-    script_path = get_script_path(script_name)
-    
-    if not script_path or not os.path.exists(script_path):
-        print(f"{Fore.RED}[ERROR] Script not found: {script_name}")
-        print(f"{Fore.YELLOW}[INFO] Make sure {script_name} is in the same folder as this application")
-        return False
-        
-    print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
-    print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
-    
-    try:
-        # Check if it's a .py file or .exe file
-        if script_path.endswith('.py'):
-            # Run Python script
-            proc = subprocess.Popen(
-                [sys.executable, script_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                encoding='utf-8',
-                errors='replace'
-            )
-        else:
-            # Run .exe file directly
-            proc = subprocess.Popen(
-                [script_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                encoding='utf-8',
-                errors='replace'
-            )
-            
-        while True:
-            check_abort()
-            output = proc.stdout.readline()
-            if output == '' and proc.poll() is not None:
-                break
-            if output:
-                print(output.strip())
-                
-        rc = proc.poll()
-        if rc == 0:
-            print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
-            return True
-        else:
-            print(f"\n{Fore.RED}[FAILED] {step_name} exited with code {rc}")
-            return False
-            
-    except KeyboardInterrupt:
-        print(f"\n{Fore.RED}[ABORT] Process interrupted by user.")
-        if 'proc' in locals():
-            proc.terminate()
-            proc.wait()
-        return False
-    except Exception as e:
-        print(f"\n{Fore.RED}[ERROR] Unexpected error: {e}")
-        return False
-
 def show_menu():
     try:
         terminal_width = shutil.get_terminal_size().columns
@@ -446,17 +423,17 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                run_script(SCRIPTS["complete"], "Full End-to-End Process")
+                extract_and_run_script(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
-                run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
+                extract_and_run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
             elif choice == "4":
-                run_script(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
+                extract_and_run_script(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
             elif choice == "5":
-                run_script(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
+                extract_and_run_script(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
             elif choice == "6":
-                run_script(SCRIPTS["step4"], "Step 4: Summary + Pivot")
+                extract_and_run_script(SCRIPTS["step4"], "Step 4: Summary + Pivot")
             elif choice == "7":
-                run_script(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
+                extract_and_run_script(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
             elif choice == "0":
                 print(f"\n{Fore.CYAN}Thank you for using ESAF AutoPilot™. Goodbye!")
                 break
