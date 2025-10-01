@@ -64,7 +64,7 @@ jobs:
           exit 1
         }
 
-       - name: Bundle all scripts and config
+    - name: Bundle all scripts and config
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
         Copy-Item "*.py" "dist/"
