@@ -64,18 +64,14 @@ jobs:
           exit 1
         }
 
-    - name: Bundle all scripts and config
+       - name: Bundle all scripts and config
       run: |
-        # Copy all .py files and config into dist (so they're available if needed)
+        $version = "${{ steps.get_version.outputs.VERSION }}"
         Copy-Item "*.py" "dist/"
         Copy-Item "esaf_config_defaults.json" "dist/"
-        
-        # Rename the .exe ONCE
-        Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$($env:VERSION).exe"
-        
-        # Final verification
-        if (Test-Path "dist\\esaf-automation-v$($env:VERSION).exe") {
-          Write-Host "✅ Final .exe ready: esaf-automation-v$($env:VERSION).exe"
+        Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$version.exe"
+        if (Test-Path "dist\\esaf-automation-v$version.exe") {
+          Write-Host "✅ Final .exe ready: esaf-automation-v$version.exe"
         } else {
           Write-Error "❌ Final .exe not found after rename"
           exit 1
@@ -91,7 +87,7 @@ jobs:
       id: create_release
       uses: softprops/action-gh-release@v1
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ steps.get_version.outputs.VERSION }}
         name: Release v${{ steps.get_version.outputs.VERSION }}
@@ -107,7 +103,7 @@ jobs:
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
