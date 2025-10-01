@@ -7,7 +7,7 @@ import keyboard
 from colorama import Fore, Style, init
 import pyautogui
 
-# Initialize colorama early with full compatibility
+# Initialize colorama with full compatibility
 init(autoreset=True, convert=True, strip=False)
 
 CONFIG_FILE = "esaf_config.json"
@@ -17,7 +17,7 @@ BACKUP_FILE = "esaf_config_backup.json"
 # ===== SCRIPT FILENAMES =====
 SCRIPTS = {
     "step1": "esaf_automation.py",
-    "step2": "merge_and_cleanup.py",
+    "step2": "merge_and_cleanup.py", 
     "step3": "Data_Analysis_Split.py",
     "step4": "summary_pivot.py",
     "step5": "Interactive_Dashboard.py",
@@ -44,7 +44,7 @@ def get_ascii_banner():
 """
 
 def check_abort():
-    """Check if user pressed ESC — can be called anywhere"""
+    """Check if user pressed ESC - can be called anywhere"""
     if keyboard.is_pressed('esc'):
         print(f"\n{Fore.RED}[ABORT] EMERGENCY STOP: ESC key pressed!")
         raise KeyboardInterrupt("User pressed ESC")
@@ -318,7 +318,7 @@ def show_menu():
     except:
         terminal_width = 80
     os.system('cls' if os.name == 'nt' else 'clear')
-    print(get_ascii_banner())  # Safe: called at runtime
+    print(get_ascii_banner())
     print()
     config_status = "[OK] CONFIGURED" if validate_config() else "[ERROR] NOT CONFIGURED"
     status_line = f"[SYSTEM STATUS: {config_status}]"
@@ -350,6 +350,49 @@ def show_menu():
     footer = "ESAF AutoPilot™ • Streamlining Access Request Management"
     print(footer.center(terminal_width))
 
+def crud_menu():
+    """Configuration Management Menu - FIXED: This was missing in your code"""
+    config = load_config() or {}
+    while True:
+        print(f"\n{Fore.CYAN}[CONFIG] CONFIGURATION MANAGEMENT")
+        print("=" * 60)
+        print("0) Edit ESAF URL")
+        print("1) Capture Mouse Coordinates")
+        print("2) Edit Keywords")
+        print("3) Edit Assignees")
+        print("4) Set Downloads Folder")
+        print("5) Edit Queues")
+        print("6) Edit Rules (Thresholds)")
+        print("7) Reset to Defaults")
+        print("8) View Current Config")
+        print("9) Back to Main Menu")
+        choice = input(f"{Fore.CYAN}Choose option (0-9): ").strip()
+        if choice == "0":
+            edit_url(config)
+        elif choice == "1":
+            capture_mouse_coordinates(config)
+        elif choice == "2":
+            edit_list(config, "keywords", "Keywords")
+        elif choice == "3":
+            edit_list(config, "assignees", "Assignees")
+        elif choice == "4":
+            folder = input(f"{Fore.CYAN}Enter Downloads folder path (or 'AUTO'): ").strip()
+            config["downloads_folder"] = folder if folder else "AUTO"
+            save_config(config)
+        elif choice == "5":
+            edit_list(config, "queues", "Queues")
+        elif choice == "6":
+            edit_rules(config)
+        elif choice == "7":
+            reset_to_defaults()
+            config = load_config() or {}
+        elif choice == "8":
+            view_config(config)
+        elif choice == "9":
+            break
+        else:
+            print(f"{Fore.YELLOW}[WARN] Invalid choice.")
+
 def main():
     ensure_defaults()
     while True:
@@ -359,32 +402,33 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                # FIXED: Run complete_process.py instead of run_full_process function
+                # Run complete_process.py for full end-to-end process
                 run_script(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
-                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
             elif choice == "4":
-                # FIXED: Correct step mapping  
                 run_script(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
             elif choice == "5":
-                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
             elif choice == "6":
-                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step4"], "Step 4: Summary + Pivot")
             elif choice == "7":
-                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
             elif choice == "0":
                 print(f"\n{Fore.CYAN}Thank you for using ESAF AutoPilot™. Goodbye!")
                 break
             else:
                 print(f"{Fore.YELLOW}[WARN] Please enter 0-7.")
+            
+            # Only pause if not exiting
             if choice != "0":
                 input(f"\n{Fore.CYAN}Press Enter to return to main menu...")
+                
         except KeyboardInterrupt:
             print(f"\n{Fore.RED}[ABORT] Interrupted. Returning to menu...")
+            input(f"\n{Fore.CYAN}Press Enter to continue...")
+        except Exception as e:
+            print(f"\n{Fore.RED}[ERROR] Unexpected error: {e}")
             input(f"\n{Fore.CYAN}Press Enter to continue...")
 
 if __name__ == "__main__":
@@ -393,4 +437,3 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding='utf-8')
     init(autoreset=True, convert=True, strip=False)
     main()
-
