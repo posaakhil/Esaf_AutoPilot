@@ -7,7 +7,7 @@ import keyboard
 from colorama import Fore, Style, init
 import pyautogui
 import tempfile
-import time
+import importlib.util
 
 # Initialize colorama with full compatibility
 init(autoreset=True, convert=True, strip=False)
@@ -55,184 +55,116 @@ def get_resource_path(relative_path):
     
     return os.path.join(base_path, relative_path)
 
-def extract_and_run_script(script_name, step_name):
-    """Extract script from bundle, modify it to run directly, and execute it"""
-    temp_dir = None
+def extract_script_to_temp(script_name):
+    """Extract script from bundle to temporary file and return path"""
     try:
-        print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
-        print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
-        
         # Get the bundled script
         bundled_path = get_resource_path(script_name)
         
         if not os.path.exists(bundled_path):
             print(f"{Fore.RED}[ERROR] Script not found in bundle: {script_name}")
-            return False
+            return None
         
         # Read the script content
         with open(bundled_path, 'r', encoding='utf-8') as f:
             script_content = f.read()
         
-        # MODIFY THE SCRIPT CONTENT to run the actual functionality
-        modified_content = modify_script_to_run_directly(script_content, script_name)
-        
-        # Create temporary directory and file
-        temp_dir = tempfile.mkdtemp(prefix="esaf_")
+        # Create temporary file
+        temp_dir = tempfile.mkdtemp()
         temp_script_path = os.path.join(temp_dir, script_name)
         
-        # Write the modified script content to temporary file
+        # Write script to temporary file
         with open(temp_script_path, 'w', encoding='utf-8') as f:
-            f.write(modified_content)
+            f.write(script_content)
         
-        print(f"{Fore.GREEN}[DEBUG] Modified and extracted {script_name}")
+        return temp_script_path
         
-        # Set up environment for subprocess
-        env = os.environ.copy()
-        env['PYTHONPATH'] = os.pathsep.join(sys.path)
+    except Exception as e:
+        print(f"{Fore.RED}[ERROR] Failed to extract script: {e}")
+        return None
+
+def run_script_directly(script_name, step_name):
+    """Run script directly without creating new process"""
+    try:
+        print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
+        print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
         
-        print(f"{Fore.CYAN}[OUTPUT] Starting {step_name} output:")
-        print(f"{Fore.CYAN}=" * 60)
-        
-        # Run the script in a subprocess with proper environment
-        proc = subprocess.Popen(
-            [sys.executable, temp_script_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True,
-            encoding='utf-8',
-            errors='replace',
-            env=env
-        )
-        
-        # Stream output with real-time abort checking
-        abort_requested = False
-        
-        while True:
-            # Check for abort
-            if keyboard.is_pressed('esc'):
-                print(f"\n{Fore.RED}[ABORT] EMERGENCY STOP: ESC key pressed!")
-                abort_requested = True
-                proc.terminate()
-                break
-                
-            # Read output
-            output = proc.stdout.readline()
-            if output == '' and proc.poll() is not None:
-                break
-            if output:
-                clean_output = output.replace('\x00', '').strip()
-                if clean_output and not clean_output.startswith('+=') and not clean_output.startswith('|') and '████' not in clean_output:
-                    print(clean_output)
-            
-            time.sleep(0.01)
-        
-        # Wait for process to complete
-        if not abort_requested:
-            proc.wait()
-        
-        rc = proc.poll()
-        
-        print(f"{Fore.CYAN}=" * 60)
-        
-        # Clean up temporary directory
-        if temp_dir and os.path.exists(temp_dir):
-            try:
-                shutil.rmtree(temp_dir)
-            except Exception as e:
-                pass
-        
-        if abort_requested:
-            print(f"\n{Fore.RED}[ABORT] {step_name} was stopped by user")
+        # Extract script to temp file
+        script_path = extract_script_to_temp(script_name)
+        if not script_path:
             return False
-        elif rc == 0:
-            print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
-            return True
-        else:
-            print(f"\n{Fore.RED}[FAILED] {step_name} exited with code {rc}")
-            return False
+        
+        # Read and execute the script
+        with open(script_path, 'r', encoding='utf-8') as f:
+            script_code = f.read()
+        
+        # Create a temporary module and execute it
+        temp_module_name = f"temp_{script_name.replace('.', '_')}"
+        spec = importlib.util.spec_from_loader(temp_module_name, loader=None)
+        temp_module = importlib.util.module_from_spec(spec)
+        
+        # Set up the environment for the script
+        script_globals = {
+            '__name__': '__main__',
+            '__file__': script_path,
+            'sys': sys,
+            'os': os,
+            'json': json,
+            'shutil': shutil,
+            'keyboard': keyboard,
+            'Fore': Fore,
+            'Style': Style,
+            'init': init,
+            'pyautogui': pyautogui,
+            'pd': None,  # pandas
+            'load_workbook': None,  # openpyxl
+            'px': None,  # plotly express
+            'go': None,  # plotly graph_objects
+            'pio': None,  # plotly io
+            'subprocess': subprocess
+        }
+        
+        # Try to import required modules for the script
+        try:
+            import pandas as pd
+            script_globals['pd'] = pd
+        except ImportError:
+            pass
             
+        try:
+            from openpyxl import load_workbook
+            script_globals['load_workbook'] = load_workbook
+        except ImportError:
+            pass
+            
+        try:
+            import plotly.express as px
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            script_globals['px'] = px
+            script_globals['go'] = go
+            script_globals['pio'] = pio
+        except ImportError:
+            pass
+        
+        # Execute the script
+        exec(script_code, script_globals)
+        
+        print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
+        return True
+        
     except KeyboardInterrupt:
         print(f"\n{Fore.RED}[ABORT] Process interrupted by user.")
-        if 'proc' in locals():
-            proc.terminate()
-            proc.wait()
-        if temp_dir and os.path.exists(temp_dir):
-            try:
-                shutil.rmtree(temp_dir)
-            except:
-                pass
         return False
     except Exception as e:
-        print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {str(e)}")
-        if temp_dir and os.path.exists(temp_dir):
-            try:
-                shutil.rmtree(temp_dir)
-            except:
-                pass
+        print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {e}")
         return False
 
-def modify_script_to_run_directly(script_content, script_name):
-    """Modify script content to run the actual functionality instead of showing menu"""
-    lines = script_content.split('\n')
-    modified_lines = []
-    
-    # Remove menu calls and ensure the script runs its main functionality
-    skip_next_lines = False
-    
-    for i, line in enumerate(lines):
-        # Skip menu display and menu function calls
-        if any(menu_indicator in line for menu_indicator in ['show_menu()', 'main_menu()', 'display_menu()']):
-            continue
-        # Skip main function definitions that show menus
-        elif 'def main()' in line and 'if __name__' not in lines[i-1] if i > 0 else True:
-            # Look ahead to see if this main function shows a menu
-            menu_found = False
-            for j in range(i, min(i+10, len(lines))):
-                if 'show_menu()' in lines[j] or 'main_menu()' in lines[j]:
-                    menu_found = True
-                    break
-            if menu_found:
-                continue
-            else:
-                modified_lines.append(line)
-        # Skip if __name__ blocks that call menu functions
-        elif 'if __name__ == "__main__":' in line:
-            # Check what's being called in this block
-            menu_call_found = False
-            for j in range(i+1, min(i+5, len(lines))):
-                next_line = lines[j].strip()
-                if next_line and ( 'show_menu()' in next_line or 'main_menu()' in next_line ):
-                    menu_call_found = True
-                    break
-            if menu_call_found:
-                skip_next_lines = True
-                continue
-            else:
-                modified_lines.append(line)
-        elif skip_next_lines:
-            if line.strip() and not line.startswith(' ') and not line.startswith('\t'):
-                skip_next_lines = False
-                modified_lines.append(line)
-            else:
-                continue
-        else:
-            modified_lines.append(line)
-    
-    # If we removed the main execution, add direct execution of the core function
-    final_content = '\n'.join(modified_lines)
-    
-    # For merge_and_cleanup.py, ensure it runs the merge functionality
-    if 'merge_and_cleanup.py' in script_name:
-        if 'def merge_files()' in final_content and 'merge_files()' not in final_content.split('def merge_files()')[1]:
-            final_content += '\n\n# Auto-execute merge functionality\nif __name__ == "__main__":\n    merge_files()'
-        elif 'def main()' in final_content and 'main()' not in final_content.split('def main()')[1]:
-            final_content += '\n\n# Auto-execute main functionality\nif __name__ == "__main__":\n    main()'
-    
-    return final_content
-
-# [REST OF YOUR FUNCTIONS REMAIN EXACTLY THE SAME - ensure_defaults, load_config, save_config, etc.]
+def check_abort():
+    """Check if user pressed ESC - can be called anywhere"""
+    if keyboard.is_pressed('esc'):
+        print(f"\n{Fore.RED}[ABORT] EMERGENCY STOP: ESC key pressed!")
+        raise KeyboardInterrupt("User pressed ESC")
 
 def ensure_defaults():
     """Create defaults file if it doesn't exist"""
@@ -547,17 +479,17 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                extract_and_run_script(SCRIPTS["complete"], "Full End-to-End Process")
+                run_script_directly(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
-                extract_and_run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
+                run_script_directly(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
             elif choice == "4":
-                extract_and_run_script(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
+                run_script_directly(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
             elif choice == "5":
-                extract_and_run_script(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
+                run_script_directly(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
             elif choice == "6":
-                extract_and_run_script(SCRIPTS["step4"], "Step 4: Summary + Pivot")
+                run_script_directly(SCRIPTS["step4"], "Step 4: Summary + Pivot")
             elif choice == "7":
-                extract_and_run_script(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
+                run_script_directly(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
             elif choice == "0":
                 print(f"\n{Fore.CYAN}Thank you for using ESAF AutoPilot™. Goodbye!")
                 break
