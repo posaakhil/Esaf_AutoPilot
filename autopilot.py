@@ -43,6 +43,27 @@ def get_ascii_banner():
 {Fore.CYAN}+==============================================================================+
 """
 
+def get_script_path(script_name):
+    """Get the correct path for scripts - works for both .py and .exe"""
+    # If running as .exe, check if script is in same directory
+    if getattr(sys, 'frozen', False):
+        # We're running as .exe
+        base_dir = os.path.dirname(sys.executable)
+        script_path = os.path.join(base_dir, script_name)
+        
+        # Check if script exists as .py file
+        if os.path.exists(script_path):
+            return script_path
+        # Check if script exists as .exe file (if other scripts are also compiled)
+        script_exe = script_name.replace('.py', '.exe')
+        script_exe_path = os.path.join(base_dir, script_exe)
+        if os.path.exists(script_exe_path):
+            return script_exe_path
+        return None
+    else:
+        # Running as .py script
+        return script_name
+
 def check_abort():
     """Check if user pressed ESC - can be called anywhere"""
     if keyboard.is_pressed('esc'):
@@ -271,23 +292,44 @@ def view_config(config):
     print(json.dumps(config, indent=2, ensure_ascii=False))
 
 def run_script(script_name, step_name):
-    """Run script with ESC monitoring and live output"""
-    if not os.path.exists(script_name):
+    """Run script with ESC monitoring and live output - FIXED for .exe deployment"""
+    script_path = get_script_path(script_name)
+    
+    if not script_path or not os.path.exists(script_path):
         print(f"{Fore.RED}[ERROR] Script not found: {script_name}")
+        print(f"{Fore.YELLOW}[INFO] Make sure {script_name} is in the same folder as this application")
         return False
+        
     print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
     print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
+    
     try:
-        proc = subprocess.Popen(
-            [sys.executable, script_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True,
-            encoding='utf-8',
-            errors='replace'
-        )
+        # Check if it's a .py file or .exe file
+        if script_path.endswith('.py'):
+            # Run Python script
+            proc = subprocess.Popen(
+                [sys.executable, script_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+        else:
+            # Run .exe file directly
+            proc = subprocess.Popen(
+                [script_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            
         while True:
             check_abort()
             output = proc.stdout.readline()
@@ -295,6 +337,7 @@ def run_script(script_name, step_name):
                 break
             if output:
                 print(output.strip())
+                
         rc = proc.poll()
         if rc == 0:
             print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
@@ -302,6 +345,7 @@ def run_script(script_name, step_name):
         else:
             print(f"\n{Fore.RED}[FAILED] {step_name} exited with code {rc}")
             return False
+            
     except KeyboardInterrupt:
         print(f"\n{Fore.RED}[ABORT] Process interrupted by user.")
         if 'proc' in locals():
@@ -351,7 +395,7 @@ def show_menu():
     print(footer.center(terminal_width))
 
 def crud_menu():
-    """Configuration Management Menu - FIXED: This was missing in your code"""
+    """Configuration Management Menu"""
     config = load_config() or {}
     while True:
         print(f"\n{Fore.CYAN}[CONFIG] CONFIGURATION MANAGEMENT")
@@ -402,7 +446,6 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                # Run complete_process.py for full end-to-end process
                 run_script(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
                 run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
@@ -420,7 +463,6 @@ def main():
             else:
                 print(f"{Fore.YELLOW}[WARN] Please enter 0-7.")
             
-            # Only pause if not exiting
             if choice != "0":
                 input(f"\n{Fore.CYAN}Press Enter to return to main menu...")
                 
@@ -432,7 +474,7 @@ def main():
             input(f"\n{Fore.CYAN}Press Enter to continue...")
 
 if __name__ == "__main__":
-    # Ensure UTF-8 and color support in .exe
+    # Ensure UTF-8 and color support
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding='utf-8')
     init(autoreset=True, convert=True, strip=False)
