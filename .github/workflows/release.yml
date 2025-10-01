@@ -1,0 +1,76 @@
+name: Build and Release ESAF Automation
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual run from Actions tab
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Read VERSION file
+      id: get_version
+      run: |
+        $version = Get-Content VERSION -Raw
+        $version = $version.Trim()
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Release version: $version"
+
+    - name: Install dependencies
+      run: |
+        pip install pyinstaller
+        pip install -r requirements.txt
+
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --onefile --windowed --add-data "esaf_config_defaults.json;." autopilot.py
+
+    - name: Rename executable
+      run: |
+        Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$($env:VERSION).exe"
+
+    - name: Upload artifact (for debugging)
+      uses: actions/upload-artifact@v4
+      with:
+        name: esaf-automation-exe
+        path: dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.get_version.outputs.VERSION }}
+        release_name: Release v${{ steps.get_version.outputs.VERSION }}
+        body: |
+          Automated release of ESAF Automation Suite.
+          
+          Includes:
+          - Full UI automation
+          - Smart assignment engine
+          - Executive dashboard
+          
+          **How to use**: Download the `.exe`, run it, and follow the menu.
+        draft: true
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+        asset_name: esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+        asset_content_type: application/octet-stream
