@@ -66,18 +66,18 @@ jobs:
 
     - name: Bundle all scripts and config
       run: |
+        # Copy all .py files and config into dist (so they're available if needed)
         Copy-Item "*.py" "dist/"
         Copy-Item "esaf_config_defaults.json" "dist/"
+        
+        # Rename the .exe ONCE
         Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$($env:VERSION).exe"
         
-        # Rename .exe
-        Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$($env:VERSION).exe"
-        
-        # Final check
+        # Final verification
         if (Test-Path "dist\\esaf-automation-v$($env:VERSION).exe") {
-          Write-Host "✅ Final .exe ready"
+          Write-Host "✅ Final .exe ready: esaf-automation-v$($env:VERSION).exe"
         } else {
-          Write-Error "❌ Final .exe not found"
+          Write-Error "❌ Final .exe not found after rename"
           exit 1
         }
 
