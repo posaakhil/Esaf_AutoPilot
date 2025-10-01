@@ -7,7 +7,6 @@ import keyboard
 from colorama import Fore, Style, init
 import pyautogui
 import tempfile
-import importlib.util
 
 # Initialize colorama with full compatibility
 init(autoreset=True, convert=True, strip=False)
@@ -45,56 +44,36 @@ def get_ascii_banner():
 {Fore.CYAN}+==============================================================================+
 """
 
-def get_resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller"""
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    
-    return os.path.join(base_path, relative_path)
-
-def extract_script_to_temp(script_name):
-    """Extract script from bundle to temporary file and return path"""
-    try:
-        # Get the bundled script
-        bundled_path = get_resource_path(script_name)
+def get_script_path(script_name):
+    """Get the correct path for scripts - works for both .py and .exe"""
+    # If running as .exe, check if script is in same directory
+    if getattr(sys, 'frozen', False):
+        # We're running as .exe
+        base_dir = os.path.dirname(sys.executable)
+        script_path = os.path.join(base_dir, script_name)
         
-        if not os.path.exists(bundled_path):
-            print(f"{Fore.RED}[ERROR] Script not found in bundle: {script_name}")
-            return None
-        
-        # Read the script content
-        with open(bundled_path, 'r', encoding='utf-8') as f:
-            script_content = f.read()
-        
-        # Create temporary file
-        temp_dir = tempfile.mkdtemp()
-        temp_script_path = os.path.join(temp_dir, script_name)
-        
-        # Write script to temporary file
-        with open(temp_script_path, 'w', encoding='utf-8') as f:
-            f.write(script_content)
-        
-        return temp_script_path
-        
-    except Exception as e:
-        print(f"{Fore.RED}[ERROR] Failed to extract script: {e}")
+        # Check if script exists as .py file
+        if os.path.exists(script_path):
+            return script_path
         return None
+    else:
+        # Running as .py script
+        return script_name
 
-def run_script_with_colors(script_name, step_name):
-    """Run script with full color support using subprocess"""
+def run_script(script_name, step_name):
+    """Run script with ESC monitoring and live output - FIXED for .exe deployment"""
+    script_path = get_script_path(script_name)
+    
+    if not script_path or not os.path.exists(script_path):
+        print(f"{Fore.RED}[ERROR] Script not found: {script_name}")
+        print(f"{Fore.YELLOW}[INFO] Make sure {script_name} is in the same folder as this application")
+        return False
+        
+    print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
+    print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
+    
     try:
-        print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
-        print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
-        
-        # Extract script to temp file
-        script_path = extract_script_to_temp(script_name)
-        if not script_path:
-            return False
-        
-        # Run the script using subprocess to preserve colors
+        # Run Python script
         proc = subprocess.Popen(
             [sys.executable, script_path],
             stdout=subprocess.PIPE,
@@ -105,16 +84,14 @@ def run_script_with_colors(script_name, step_name):
             encoding='utf-8',
             errors='replace'
         )
-        
-        # Read output line by line and print with colors preserved
+            
         while True:
             check_abort()
             output = proc.stdout.readline()
             if output == '' and proc.poll() is not None:
                 break
             if output:
-                # Print the output as-is (colors will be preserved)
-                print(output, end='', flush=True)
+                print(output.strip())
                 
         rc = proc.poll()
         if rc == 0:
@@ -131,7 +108,7 @@ def run_script_with_colors(script_name, step_name):
             proc.wait()
         return False
     except Exception as e:
-        print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {e}")
+        print(f"\n{Fore.RED}[ERROR] Unexpected error: {e}")
         return False
 
 def check_abort():
@@ -453,17 +430,17 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                run_script_with_colors(SCRIPTS["complete"], "Full End-to-End Process")
+                run_script(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
-                run_script_with_colors(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
+                run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
             elif choice == "4":
-                run_script_with_colors(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
+                run_script(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
             elif choice == "5":
-                run_script_with_colors(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
+                run_script(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
             elif choice == "6":
-                run_script_with_colors(SCRIPTS["step4"], "Step 4: Summary + Pivot")
+                run_script(SCRIPTS["step4"], "Step 4: Summary + Pivot")
             elif choice == "7":
-                run_script_with_colors(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
+                run_script(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
             elif choice == "0":
                 print(f"\n{Fore.CYAN}Thank you for using ESAF AutoPilot™. Goodbye!")
                 break
