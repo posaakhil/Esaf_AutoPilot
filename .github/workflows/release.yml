@@ -31,10 +31,31 @@ jobs:
         pip install pyinstaller
         pip install -r requirements.txt
 
+    - name: Verify required files exist
+      run: |
+        $required = @(
+          "autopilot.py",
+          "esaf_automation.py",
+          "merge_and_cleanup.py",
+          "Data_Analysis_Split.py",
+          "summary_pivot.py",
+          "Interactive_Dashboard.py",
+          "complete_process.py",
+          "esaf_config_defaults.json"
+        )
+        foreach ($file in $required) {
+          if (-not (Test-Path $file)) {
+            Write-Error "Missing required file: $file"
+            exit 1
+          }
+        }
+        Write-Host "✅ All required files present"
+
     - name: Build executable with PyInstaller
       run: |
-        pyi-makespec --onefile --windowed --add-data "esaf_config_defaults.json;." autopilot.py
-        pyinstaller autopilot.spec
+        pyinstaller --onefile --windowed ^
+          --add-data "esaf_config_defaults.json;." ^
+          autopilot.py
 
     - name: Verify .exe was built
       run: |
@@ -45,9 +66,22 @@ jobs:
           exit 1
         }
 
-    - name: Rename executable
+    - name: Bundle all scripts and config for runtime
       run: |
+        # Copy all .py files and defaults config into dist/
+        Copy-Item "*.py" "dist/"
+        Copy-Item "esaf_config_defaults.json" "dist/"
+        
+        # Rename .exe
         Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$($env:VERSION).exe"
+        
+        # Final check
+        if (Test-Path "dist\\esaf-automation-v$($env:VERSION).exe") {
+          Write-Host "✅ Final .exe ready"
+        } else {
+          Write-Error "❌ Final .exe not found"
+          exit 1
+        }
 
     - name: Upload artifact (for debugging)
       uses: actions/upload-artifact@v4
@@ -59,25 +93,23 @@ jobs:
       id: create_release
       uses: softprops/action-gh-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       with:
         tag_name: v${{ steps.get_version.outputs.VERSION }}
         name: Release v${{ steps.get_version.outputs.VERSION }}
         body: |
-          Automated release of ESAF Automation Suite.
+          ESAF Automation Suite v${{ steps.get_version.outputs.VERSION }}
           
-          Includes:
-          - Full UI automation
-          - Smart assignment engine
-          - Executive dashboard
-          
-          **How to use**: Download the `.exe`, run it, and follow the menu.
+          **First run instructions**:
+          1. Run the `.exe`
+          2. Go to **Option 1 → Option 7** to generate `esaf_config.json`
+          3. Then use any option
         draft: true
 
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
