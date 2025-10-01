@@ -1,9 +1,9 @@
-name: Build and Release ESAF Automation
+\name: Build and Release ESAF Automation
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Allows manual run from Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
@@ -33,7 +33,29 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --add-data "esaf_config_defaults.json;." autopilot.py
+        pyinstaller --onefile --windowed ^
+          --add-data "esaf_config_defaults.json;." ^
+          --hidden-import=pandas ^
+          --hidden-import=openpyxl ^
+          --hidden-import=xlrd ^
+          --hidden-import=plotly ^
+          --hidden-import=pyautogui ^
+          --hidden-import=pyperclip ^
+          --hidden-import=pygetwindow ^
+          --hidden-import=PIL ^
+          --hidden-import=keyboard ^
+          --hidden-import=colorama ^
+          --hidden-import=cv2 ^
+          autopilot.py
+
+    - name: Verify .exe was built
+      run: |
+        if (Test-Path "dist\\autopilot.exe") {
+          Write-Host "✅ .exe built successfully"
+        } else {
+          Write-Error "❌ .exe not found in dist folder"
+          exit 1
+        }
 
     - name: Rename executable
       run: |
@@ -47,12 +69,12 @@ jobs:
 
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       with:
         tag_name: v${{ steps.get_version.outputs.VERSION }}
-        release_name: Release v${{ steps.get_version.outputs.VERSION }}
+        name: Release v${{ steps.get_version.outputs.VERSION }}
         body: |
           Automated release of ESAF Automation Suite.
           
@@ -63,14 +85,9 @@ jobs:
           
           **How to use**: Download the `.exe`, run it, and follow the menu.
         draft: true
-        prerelease: false
 
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
-        asset_name: esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
-        asset_content_type: application/octet-stream
+        name: release-asset
+        path: dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
