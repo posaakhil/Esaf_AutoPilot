@@ -53,9 +53,7 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --onefile --windowed ^
-          --add-data "esaf_config_defaults.json;." ^
-          autopilot.py
+        pyinstaller --onefile --windowed --add-data "esaf_config_defaults.json;." autopilot.py
 
     - name: Verify .exe was built
       run: |
@@ -66,11 +64,11 @@ jobs:
           exit 1
         }
 
-    - name: Bundle all scripts and config for runtime
+    - name: Bundle all scripts and config
       run: |
-        # Copy all .py files and defaults config into dist/
         Copy-Item "*.py" "dist/"
         Copy-Item "esaf_config_defaults.json" "dist/"
+        Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$($env:VERSION).exe"
         
         # Rename .exe
         Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$($env:VERSION).exe"
