@@ -53,7 +53,7 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-       pyinstaller --onefile --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "jinja2" autopilot.py
+       pyinstaller --onefile --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "pandas" --hidden-import "openpyxl" --hidden-import "plotly" --hidden-import "selenium" --hidden-import "colorama" --hidden-import "keyboard" --hidden-import "pyautogui" --hidden-import "jinja2" --hidden-import "plotly.graph_objects" --hidden-import "plotly.express" autopilot.py
 
     - name: Verify .exe was built
       run: |
