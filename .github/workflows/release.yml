@@ -1,4 +1,4 @@
-\name: Build and Release ESAF Automation
+name: Build and Release ESAF Automation
 
 on:
   push:
