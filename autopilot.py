@@ -20,7 +20,7 @@ SCRIPTS = {
     "step2": "merge_and_cleanup.py",
     "step3": "Data_Analysis_Split.py",
     "step4": "summary_pivot.py",
-    "step5": "Interactive_Dashboard.py"
+    "step5": "Interactive_Dashboard.py",
     "complete": "complete_process.py"
 }
 
@@ -393,3 +393,4 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding='utf-8')
     init(autoreset=True, convert=True, strip=False)
     main()
+
