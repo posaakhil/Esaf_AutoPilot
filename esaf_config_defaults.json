@@ -1,0 +1,68 @@
+{
+  "url": "https://esaf.hca.corpad.net/",
+  "downloads_folder": "AUTO",
+  "mouse_coords": {
+    "requests_assigned": [168, 212],
+    "advanced_filter": [728, 317],
+    "app_field": [589, 516],
+    "click_outside": [534, 512],
+    "apply_button": [1357, 780],
+    "export_xls": [1834, 317],
+    "status_field": [588, 674],
+    "apply_2_button": [1358, 781]
+  },
+  "timings": {
+    "wait_after_page_load": 6,
+    "wait_after_requests_click": 3,
+    "wait_after_advanced_filter_open": 2,
+    "wait_after_paste": 2,
+    "wait_after_apply": 5,
+    "wait_after_export": 3,
+    "max_wait_for_download": 30,
+    "check_interval": 1
+  },
+  "queues": [
+    "CORP-ACCESS-INDIA"
+  ],
+  "keywords": [
+    "SMART",
+    "SMART Inventory",
+    "Smart admin",
+    "abc",
+    "HOST"
+  ],
+  "assignees": [
+    "Akhil",
+    "Swathi",
+    "Divya",
+    "Amreen",
+    "Riya",
+    "Madhurima",
+    "Vamsitha"
+  ],
+  "rules": {
+    "india_overflow_threshold": 70,
+    "max_per_person_domestic": 15,
+    "max_per_person_meditech": 5,
+    "requests_per_app_domestic": 2,
+    "india_keyword": "CORP-ACCESS-INDIA",
+    "meditech_keyword": "MEDITECH_Expanse_CAP_Panhandle_Market"
+  },
+  "output_file": "Today_Assignment.xlsx",
+  "keep_columns": [
+    "User name",
+    "sAMAccountName",
+    "Request date",
+    "Last updated time",
+    "Requested by",
+    "Request",
+    "Status",
+    "Application"
+  ],
+  "excel_options": {
+    "auto_fit_column_width": true,
+    "wrap_text": true
+  },
+  "no_requests_text": "There are no requests available",
+  "base_assignment_folder": "assignment_"
+}
