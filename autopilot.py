@@ -21,6 +21,7 @@ SCRIPTS = {
     "step3": "Data_Analysis_Split.py",
     "step4": "summary_pivot.py",
     "step5": "Interactive_Dashboard.py"
+    "complete": "complete_process.py"
 }
 
 def get_ascii_banner():
@@ -335,12 +336,12 @@ def show_menu():
     print()
     menu_items = [
         "1) Configuration Management",
-        "2) Run FULL End-to-End Process",
-        "3) Step 1: ESAF UI Automation",
-        "4) Step 2: Merge & Cleanup",
-        "5) Step 3: Assign Requests to Team",
-        "6) Step 4: Summary + Pivot",
-        "7) Step 5: Interactive Dashboard",
+        "2) Run FULL End-to-End Process (complete_process.py)",
+        "3) Step 1: ESAF UI Automation (esaf_automation.py)",
+        "4) Step 2: Merge & Cleanup (merge_and_cleanup.py)",
+        "5) Step 3: Assign Requests to Team (Data_Analysis_Split.py)",
+        "6) Step 4: Summary + Pivot (summary_pivot.py)",
+        "7) Step 5: Interactive Dashboard (Interactive_Dashboard.py)",
         "0) Exit ESAF AutoPilot"
     ]
     for item in menu_items:
@@ -348,78 +349,6 @@ def show_menu():
     print()
     footer = "ESAF AutoPilot™ • Streamlining Access Request Management"
     print(footer.center(terminal_width))
-
-def run_full_process():
-    print(f"\n{Fore.GREEN}[START] INITIATING FULL END-TO-END PROCESS")
-    print("=" * 60)
-    if not validate_config():
-        print(f"{Fore.RED}[ERROR] Configuration is missing or invalid!")
-        print(f"{Fore.RED}Please run Option 1 to set up your configuration first.")
-        return
-    config = load_config()
-    DOWNLOADS_FOLDER = resolve_downloads_folder(config)
-    print(f"{Fore.CYAN}[FOLDER] Using Downloads: {Fore.WHITE}{DOWNLOADS_FOLDER}")
-    steps = [
-        (SCRIPTS["step1"], "Step 1: ESAF UI Automation"),
-        (SCRIPTS["step2"], "Step 2: Merge & Cleanup"),
-        (SCRIPTS["step3"], "Step 3: Assign Requests to Team"),
-        (SCRIPTS["step4"], "Step 4: Summary + Pivot"),
-        (SCRIPTS["step5"], "Step 5: Interactive Dashboard")
-    ]
-    try:
-        for i, (script, step_name) in enumerate(steps, 1):
-            print(f"\n{Fore.CYAN}[STEP {i}/5] {step_name}")
-            print("-" * 50)
-            success = run_script(script, step_name)
-            if not success:
-                print(f"{Fore.RED}[STOP] Full process halted at {step_name}")
-                return
-        print(f"\n{Fore.GREEN}[COMPLETE] FULL PROCESS SUCCESSFUL!")
-        print("=" * 60)
-    except KeyboardInterrupt:
-        print(f"\n{Fore.RED}[ABORT] Process manually stopped.")
-
-def crud_menu():
-    config = load_config() or {}
-    while True:
-        print(f"\n{Fore.CYAN}[CONFIG] CONFIGURATION MANAGEMENT")
-        print("=" * 60)
-        print("0) Edit ESAF URL")
-        print("1) Capture Mouse Coordinates")
-        print("2) Edit Keywords")
-        print("3) Edit Assignees")
-        print("4) Set Downloads Folder")
-        print("5) Edit Queues")
-        print("6) Edit Rules (Thresholds)")
-        print("7) Reset to Defaults")
-        print("8) View Current Config")
-        print("9) Back to Main Menu")
-        choice = input(f"{Fore.CYAN}Choose option (0-9): ").strip()
-        if choice == "0":
-            edit_url(config)
-        elif choice == "1":
-            capture_mouse_coordinates(config)
-        elif choice == "2":
-            edit_list(config, "keywords", "Keywords")
-        elif choice == "3":
-            edit_list(config, "assignees", "Assignees")
-        elif choice == "4":
-            folder = input(f"{Fore.CYAN}Enter Downloads folder path (or 'AUTO'): ").strip()
-            config["downloads_folder"] = folder if folder else "AUTO"
-            save_config(config)
-        elif choice == "5":
-            edit_list(config, "queues", "Queues")
-        elif choice == "6":
-            edit_rules(config)
-        elif choice == "7":
-            reset_to_defaults()
-            config = load_config() or {}
-        elif choice == "8":
-            view_config(config)
-        elif choice == "9":
-            break
-        else:
-            print(f"{Fore.YELLOW}[WARN] Invalid choice.")
 
 def main():
     ensure_defaults()
@@ -430,16 +359,22 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                run_full_process()
+                # FIXED: Run complete_process.py instead of run_full_process function
+                run_script(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
+                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
             elif choice == "4":
+                # FIXED: Correct step mapping  
                 run_script(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
             elif choice == "5":
+                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
             elif choice == "6":
+                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step4"], "Step 4: Summary + Pivot")
             elif choice == "7":
+                # FIXED: Correct step mapping
                 run_script(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
             elif choice == "0":
                 print(f"\n{Fore.CYAN}Thank you for using ESAF AutoPilot™. Goodbye!")
