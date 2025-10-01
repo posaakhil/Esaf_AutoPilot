@@ -7,8 +7,8 @@ import keyboard
 from colorama import Fore, Style, init
 import pyautogui
 
-# Initialize colorama
-init(autoreset=True)
+# Initialize colorama early with full compatibility
+init(autoreset=True, convert=True, strip=False)
 
 CONFIG_FILE = "esaf_config.json"
 DEFAULTS_FILE = "esaf_config_defaults.json"
@@ -23,8 +23,9 @@ SCRIPTS = {
     "step5": "Interactive_Dashboard.py"
 }
 
-# ===== ASCII BANNER (FULLY ASCII-COMPATIBLE) =====
-ASCII_ART = f"""
+def get_ascii_banner():
+    """Return ASCII banner as plain string (no Unicode, safe for all terminals)"""
+    return f"""
 {Fore.CYAN}+==============================================================================+
 {Fore.CYAN}|                                                                              |
 {Fore.CYAN}|  {Fore.BLUE}███████╗███████╗ █████╗ ███████╗     █████╗ ██╗   ██╗████████╗ ██████╗ {Fore.CYAN}  |
@@ -316,7 +317,7 @@ def show_menu():
     except:
         terminal_width = 80
     os.system('cls' if os.name == 'nt' else 'clear')
-    print(ASCII_ART)
+    print(get_ascii_banner())  # Safe: called at runtime
     print()
     config_status = "[OK] CONFIGURED" if validate_config() else "[ERROR] NOT CONFIGURED"
     status_line = f"[SYSTEM STATUS: {config_status}]"
@@ -452,4 +453,8 @@ def main():
             input(f"\n{Fore.CYAN}Press Enter to continue...")
 
 if __name__ == "__main__":
+    # Ensure UTF-8 and color support in .exe
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding='utf-8')
+    init(autoreset=True, convert=True, strip=False)
     main()
