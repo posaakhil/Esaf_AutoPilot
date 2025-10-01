@@ -50,19 +50,13 @@ def get_resource_path(relative_path):
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
-        print(f"{Fore.GREEN}[DEBUG] Running in PyInstaller bundle, base path: {base_path}")
     except Exception:
         base_path = os.path.abspath(".")
-        print(f"{Fore.YELLOW}[DEBUG] Running in development, base path: {base_path}")
     
-    path = os.path.join(base_path, relative_path)
-    print(f"{Fore.CYAN}[DEBUG] Resolved path for {relative_path}: {path}")
-    print(f"{Fore.CYAN}[DEBUG] Path exists: {os.path.exists(path)}")
-    
-    return path
+    return os.path.join(base_path, relative_path)
 
 def extract_and_run_script(script_name, step_name):
-    """Extract script from bundle to temporary file and run it in a subprocess"""
+    """Extract script from bundle, modify it to run directly, and execute it"""
     temp_dir = None
     try:
         print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
@@ -73,25 +67,24 @@ def extract_and_run_script(script_name, step_name):
         
         if not os.path.exists(bundled_path):
             print(f"{Fore.RED}[ERROR] Script not found in bundle: {script_name}")
-            print(f"{Fore.RED}[DEBUG] Current directory: {os.getcwd()}")
-            print(f"{Fore.RED}[DEBUG] Directory contents: {os.listdir('.')}")
             return False
-        
-        print(f"{Fore.GREEN}[DEBUG] Found script: {bundled_path}")
         
         # Read the script content
         with open(bundled_path, 'r', encoding='utf-8') as f:
             script_content = f.read()
         
+        # MODIFY THE SCRIPT CONTENT to run the actual functionality
+        modified_content = modify_script_to_run_directly(script_content, script_name)
+        
         # Create temporary directory and file
         temp_dir = tempfile.mkdtemp(prefix="esaf_")
         temp_script_path = os.path.join(temp_dir, script_name)
         
-        # Write the original script content to temporary file
+        # Write the modified script content to temporary file
         with open(temp_script_path, 'w', encoding='utf-8') as f:
-            f.write(script_content)
+            f.write(modified_content)
         
-        print(f"{Fore.GREEN}[DEBUG] Extracted {script_name} to: {temp_script_path}")
+        print(f"{Fore.GREEN}[DEBUG] Modified and extracted {script_name}")
         
         # Set up environment for subprocess
         env = os.environ.copy()
@@ -130,10 +123,10 @@ def extract_and_run_script(script_name, step_name):
                 break
             if output:
                 clean_output = output.replace('\x00', '').strip()
-                if clean_output:
+                if clean_output and not clean_output.startswith('+=') and not clean_output.startswith('|') and '████' not in clean_output:
                     print(clean_output)
             
-            time.sleep(0.01)  # Small delay to prevent CPU overload
+            time.sleep(0.01)
         
         # Wait for process to complete
         if not abort_requested:
@@ -147,9 +140,8 @@ def extract_and_run_script(script_name, step_name):
         if temp_dir and os.path.exists(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
-                print(f"{Fore.GREEN}[DEBUG] Cleaned up temporary directory")
             except Exception as e:
-                print(f"{Fore.YELLOW}[WARN] Could not clean up temp dir: {e}")
+                pass
         
         if abort_requested:
             print(f"\n{Fore.RED}[ABORT] {step_name} was stopped by user")
@@ -166,7 +158,6 @@ def extract_and_run_script(script_name, step_name):
         if 'proc' in locals():
             proc.terminate()
             proc.wait()
-        # Clean up temporary directory
         if temp_dir and os.path.exists(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
@@ -175,15 +166,73 @@ def extract_and_run_script(script_name, step_name):
         return False
     except Exception as e:
         print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        # Clean up temporary directory
         if temp_dir and os.path.exists(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
             except:
                 pass
         return False
+
+def modify_script_to_run_directly(script_content, script_name):
+    """Modify script content to run the actual functionality instead of showing menu"""
+    lines = script_content.split('\n')
+    modified_lines = []
+    
+    # Remove menu calls and ensure the script runs its main functionality
+    skip_next_lines = False
+    
+    for i, line in enumerate(lines):
+        # Skip menu display and menu function calls
+        if any(menu_indicator in line for menu_indicator in ['show_menu()', 'main_menu()', 'display_menu()']):
+            continue
+        # Skip main function definitions that show menus
+        elif 'def main()' in line and 'if __name__' not in lines[i-1] if i > 0 else True:
+            # Look ahead to see if this main function shows a menu
+            menu_found = False
+            for j in range(i, min(i+10, len(lines))):
+                if 'show_menu()' in lines[j] or 'main_menu()' in lines[j]:
+                    menu_found = True
+                    break
+            if menu_found:
+                continue
+            else:
+                modified_lines.append(line)
+        # Skip if __name__ blocks that call menu functions
+        elif 'if __name__ == "__main__":' in line:
+            # Check what's being called in this block
+            menu_call_found = False
+            for j in range(i+1, min(i+5, len(lines))):
+                next_line = lines[j].strip()
+                if next_line and ( 'show_menu()' in next_line or 'main_menu()' in next_line ):
+                    menu_call_found = True
+                    break
+            if menu_call_found:
+                skip_next_lines = True
+                continue
+            else:
+                modified_lines.append(line)
+        elif skip_next_lines:
+            if line.strip() and not line.startswith(' ') and not line.startswith('\t'):
+                skip_next_lines = False
+                modified_lines.append(line)
+            else:
+                continue
+        else:
+            modified_lines.append(line)
+    
+    # If we removed the main execution, add direct execution of the core function
+    final_content = '\n'.join(modified_lines)
+    
+    # For merge_and_cleanup.py, ensure it runs the merge functionality
+    if 'merge_and_cleanup.py' in script_name:
+        if 'def merge_files()' in final_content and 'merge_files()' not in final_content.split('def merge_files()')[1]:
+            final_content += '\n\n# Auto-execute merge functionality\nif __name__ == "__main__":\n    merge_files()'
+        elif 'def main()' in final_content and 'main()' not in final_content.split('def main()')[1]:
+            final_content += '\n\n# Auto-execute main functionality\nif __name__ == "__main__":\n    main()'
+    
+    return final_content
+
+# [REST OF YOUR FUNCTIONS REMAIN EXACTLY THE SAME - ensure_defaults, load_config, save_config, etc.]
 
 def ensure_defaults():
     """Create defaults file if it doesn't exist"""
