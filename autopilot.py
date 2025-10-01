@@ -83,8 +83,8 @@ def extract_script_to_temp(script_name):
         print(f"{Fore.RED}[ERROR] Failed to extract script: {e}")
         return None
 
-def run_script_directly(script_name, step_name):
-    """Run script directly without creating new process"""
+def run_script_with_colors(script_name, step_name):
+    """Run script with full color support using subprocess"""
     try:
         print(f"\n{Fore.CYAN}[RUN] Starting {step_name}...")
         print(f"{Fore.YELLOW}[ABORT] Press ESC anytime to stop!")
@@ -94,67 +94,41 @@ def run_script_directly(script_name, step_name):
         if not script_path:
             return False
         
-        # Read and execute the script
-        with open(script_path, 'r', encoding='utf-8') as f:
-            script_code = f.read()
+        # Run the script using subprocess to preserve colors
+        proc = subprocess.Popen(
+            [sys.executable, script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+            encoding='utf-8',
+            errors='replace'
+        )
         
-        # Create a temporary module and execute it
-        temp_module_name = f"temp_{script_name.replace('.', '_')}"
-        spec = importlib.util.spec_from_loader(temp_module_name, loader=None)
-        temp_module = importlib.util.module_from_spec(spec)
-        
-        # Set up the environment for the script
-        script_globals = {
-            '__name__': '__main__',
-            '__file__': script_path,
-            'sys': sys,
-            'os': os,
-            'json': json,
-            'shutil': shutil,
-            'keyboard': keyboard,
-            'Fore': Fore,
-            'Style': Style,
-            'init': init,
-            'pyautogui': pyautogui,
-            'pd': None,  # pandas
-            'load_workbook': None,  # openpyxl
-            'px': None,  # plotly express
-            'go': None,  # plotly graph_objects
-            'pio': None,  # plotly io
-            'subprocess': subprocess
-        }
-        
-        # Try to import required modules for the script
-        try:
-            import pandas as pd
-            script_globals['pd'] = pd
-        except ImportError:
-            pass
+        # Read output line by line and print with colors preserved
+        while True:
+            check_abort()
+            output = proc.stdout.readline()
+            if output == '' and proc.poll() is not None:
+                break
+            if output:
+                # Print the output as-is (colors will be preserved)
+                print(output, end='', flush=True)
+                
+        rc = proc.poll()
+        if rc == 0:
+            print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
+            return True
+        else:
+            print(f"\n{Fore.RED}[FAILED] {step_name} exited with code {rc}")
+            return False
             
-        try:
-            from openpyxl import load_workbook
-            script_globals['load_workbook'] = load_workbook
-        except ImportError:
-            pass
-            
-        try:
-            import plotly.express as px
-            import plotly.graph_objects as go
-            import plotly.io as pio
-            script_globals['px'] = px
-            script_globals['go'] = go
-            script_globals['pio'] = pio
-        except ImportError:
-            pass
-        
-        # Execute the script
-        exec(script_code, script_globals)
-        
-        print(f"\n{Fore.GREEN}[SUCCESS] {step_name} completed!")
-        return True
-        
     except KeyboardInterrupt:
         print(f"\n{Fore.RED}[ABORT] Process interrupted by user.")
+        if 'proc' in locals():
+            proc.terminate()
+            proc.wait()
         return False
     except Exception as e:
         print(f"\n{Fore.RED}[ERROR] Failed to run {step_name}: {e}")
@@ -396,33 +370,34 @@ def show_menu():
     print(get_ascii_banner())
     print()
     config_status = "[OK] CONFIGURED" if validate_config() else "[ERROR] NOT CONFIGURED"
-    status_line = f"[SYSTEM STATUS: {config_status}]"
+    status_color = Fore.GREEN if validate_config() else Fore.RED
+    status_line = f"[SYSTEM STATUS: {status_color}{config_status}{Fore.RESET}]"
     print(status_line.center(terminal_width))
     print()
     notices = [
-        "[TIP] First-time user? Configure (Option 1) before running full process!",
-        "[WARNING] Press ESC anytime during automation to ABORT immediately!",
-        "[INFO] HCA Healthcare Internal Use Only • v2.1"
+        f"{Fore.CYAN}[TIP] First-time user? Configure (Option 1) before running full process!",
+        f"{Fore.RED}[WARNING] Press ESC anytime during automation to ABORT immediately!",
+        f"{Fore.GREEN}[INFO] HCA Healthcare Internal Use Only • v2.1"
     ]
     for notice in notices:
         print(notice.center(terminal_width))
     print()
-    print(" MAIN OPERATIONS MENU ".center(terminal_width, "="))
+    print(f"{Fore.MAGENTA} MAIN OPERATIONS MENU ".center(terminal_width, "="))
     print()
     menu_items = [
-        "1) Configuration Management",
-        "2) Run FULL End-to-End Process (complete_process.py)",
-        "3) Step 1: ESAF UI Automation (esaf_automation.py)",
-        "4) Step 2: Merge & Cleanup (merge_and_cleanup.py)",
-        "5) Step 3: Assign Requests to Team (Data_Analysis_Split.py)",
-        "6) Step 4: Summary + Pivot (summary_pivot.py)",
-        "7) Step 5: Interactive Dashboard (Interactive_Dashboard.py)",
-        "0) Exit ESAF AutoPilot"
+        f"{Fore.WHITE}1) {Fore.CYAN}Configuration Management",
+        f"{Fore.WHITE}2) {Fore.GREEN}Run FULL End-to-End Process (complete_process.py)",
+        f"{Fore.WHITE}3) {Fore.BLUE}Step 1: ESAF UI Automation (esaf_automation.py)",
+        f"{Fore.WHITE}4) {Fore.BLUE}Step 2: Merge & Cleanup (merge_and_cleanup.py)",
+        f"{Fore.WHITE}5) {Fore.BLUE}Step 3: Assign Requests to Team (Data_Analysis_Split.py)",
+        f"{Fore.WHITE}6) {Fore.BLUE}Step 4: Summary + Pivot (summary_pivot.py)",
+        f"{Fore.WHITE}7) {Fore.BLUE}Step 5: Interactive Dashboard (Interactive_Dashboard.py)",
+        f"{Fore.WHITE}0) {Fore.RED}Exit ESAF AutoPilot"
     ]
     for item in menu_items:
         print("    " + item)
     print()
-    footer = "ESAF AutoPilot™ • Streamlining Access Request Management"
+    footer = f"{Fore.CYAN}ESAF AutoPilot™ • Streamlining Access Request Management"
     print(footer.center(terminal_width))
 
 def crud_menu():
@@ -430,17 +405,18 @@ def crud_menu():
     config = load_config() or {}
     while True:
         print(f"\n{Fore.CYAN}[CONFIG] CONFIGURATION MANAGEMENT")
-        print("=" * 60)
-        print("0) Edit ESAF URL")
-        print("1) Capture Mouse Coordinates")
-        print("2) Edit Keywords")
-        print("3) Edit Assignees")
-        print("4) Set Downloads Folder")
-        print("5) Edit Queues")
-        print("6) Edit Rules (Thresholds)")
-        print("7) Reset to Defaults")
-        print("8) View Current Config")
-        print("9) Back to Main Menu")
+        print(f"{Fore.CYAN}=" * 60)
+        print(f"{Fore.YELLOW}0) {Fore.CYAN}Edit ESAF URL")
+        print(f"{Fore.YELLOW}1) {Fore.CYAN}Capture Mouse Coordinates")
+        print(f"{Fore.YELLOW}2) {Fore.CYAN}Edit Keywords")
+        print(f"{Fore.YELLOW}3) {Fore.CYAN}Edit Assignees")
+        print(f"{Fore.YELLOW}4) {Fore.CYAN}Set Downloads Folder")
+        print(f"{Fore.YELLOW}5) {Fore.CYAN}Edit Queues")
+        print(f"{Fore.YELLOW}6) {Fore.CYAN}Edit Rules (Thresholds)")
+        print(f"{Fore.YELLOW}7) {Fore.CYAN}Reset to Defaults")
+        print(f"{Fore.YELLOW}8) {Fore.CYAN}View Current Config")
+        print(f"{Fore.YELLOW}9) {Fore.RED}Back to Main Menu")
+        print(f"{Fore.CYAN}=" * 60)
         choice = input(f"{Fore.CYAN}Choose option (0-9): ").strip()
         if choice == "0":
             edit_url(config)
@@ -477,17 +453,17 @@ def main():
             if choice == "1":
                 crud_menu()
             elif choice == "2":
-                run_script_directly(SCRIPTS["complete"], "Full End-to-End Process")
+                run_script_with_colors(SCRIPTS["complete"], "Full End-to-End Process")
             elif choice == "3":
-                run_script_directly(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
+                run_script_with_colors(SCRIPTS["step1"], "Step 1: ESAF UI Automation")
             elif choice == "4":
-                run_script_directly(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
+                run_script_with_colors(SCRIPTS["step2"], "Step 2: Merge & Cleanup")
             elif choice == "5":
-                run_script_directly(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
+                run_script_with_colors(SCRIPTS["step3"], "Step 3: Assign Requests to Team")
             elif choice == "6":
-                run_script_directly(SCRIPTS["step4"], "Step 4: Summary + Pivot")
+                run_script_with_colors(SCRIPTS["step4"], "Step 4: Summary + Pivot")
             elif choice == "7":
-                run_script_directly(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
+                run_script_with_colors(SCRIPTS["step5"], "Step 5: Interactive Dashboard")
             elif choice == "0":
                 print(f"\n{Fore.CYAN}Thank you for using ESAF AutoPilot™. Goodbye!")
                 break
@@ -510,6 +486,3 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding='utf-8')
     init(autoreset=True, convert=True, strip=False)
     main()
-
-
- 
