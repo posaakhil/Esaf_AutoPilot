@@ -1,10 +1,9 @@
-# .github/workflows/public-release.yml
 name: Public Release ESAF Automation
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (must match VERSION file)'
+      confirm_version:
+        description: 'Version to release (must match VERSION file exactly)'
         required: true
         type: string
 
@@ -20,7 +19,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Optional: Validate input version matches VERSION file
       - name: Read VERSION file
         id: get_version
         run: |
@@ -28,8 +26,8 @@ jobs:
           $version = $version.Trim()
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
           echo "Release version: $version"
-          if ("${{ github.event.inputs.version }}" -ne "$version") {
-            Write-Error "Input version (${{ github.event.inputs.version }}) does not match VERSION file ($version)"
+          if ("${{ github.event.inputs.confirm_version }}" -ne "$version") {
+            Write-Error "Input version (${{ github.event.inputs.confirm_version }}) does NOT match VERSION file ($version). Aborting."
             exit 1
           }
 
@@ -60,7 +58,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-         pyinstaller --onefile --icon="favicon-esaf.ico" --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "pandas" --hidden-import "openpyxl" --hidden-import "plotly" --hidden-import "colorama" --hidden-import "keyboard" --hidden-import "pyautogui" --hidden-import "jinja2" --hidden-import "plotly.graph_objects" --hidden-import "plotly.express" --hidden-import "Pillow" autopilot.py
+         pyinstaller --onefile --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "pandas" --hidden-import "openpyxl" --hidden-import "plotly" --hidden-import "colorama" --hidden-import "keyboard" --hidden-import "pyautogui" --hidden-import "jinja2" --hidden-import "plotly.graph_objects" --hidden-import "plotly.express" --hidden-import "Pillow" autopilot.py
 
       - name: Verify .exe was built
         run: |
@@ -103,7 +101,7 @@ jobs:
             1. Run the `.exe`
             2. Go to **Option 1 → Option 7** to generate `esaf_config.json`
             3. Then use any option
-          draft: false   # ← Now public!
+          draft: false
           prerelease: false
           files: |
             dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
