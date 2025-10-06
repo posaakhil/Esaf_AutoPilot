@@ -2,7 +2,7 @@ name: Build and Release ESAF Automation
 
 on:
   push:
-    branches: [ main ]
+    branches: [ Dev ]
   workflow_dispatch:
 
 jobs:
