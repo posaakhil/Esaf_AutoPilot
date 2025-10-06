@@ -1,15 +1,17 @@
 name: Public Release ESAF Automation
+
 on:
   workflow_dispatch:
     inputs:
       confirm_version:
-        description: 'Version to release (must match VERSION file exactly)'
+        description: 'Version to release (must exactly match VERSION file)'
         required: true
         type: string
 
 jobs:
-  build_and_public_release:
+  build:
     runs-on: windows-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -58,7 +60,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-         pyinstaller --onefile --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "pandas" --hidden-import "openpyxl" --hidden-import "plotly" --hidden-import "colorama" --hidden-import "keyboard" --hidden-import "pyautogui" --hidden-import "jinja2" --hidden-import "plotly.graph_objects" --hidden-import "plotly.express" --hidden-import "Pillow" autopilot.py
+          pyinstaller --onefile --icon="favicon-esaf.ico" --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "pandas" --hidden-import "openpyxl" --hidden-import "plotly" --hidden-import "colorama" --hidden-import "keyboard" --hidden-import "pyautogui" --hidden-import "jinja2" --hidden-import "plotly.graph_objects" --hidden-import "plotly.express" --hidden-import "Pillow" autopilot.py 
 
       - name: Verify .exe was built
         run: |
@@ -88,6 +90,15 @@ jobs:
           name: esaf-automation-exe
           path: dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
 
+      - name: Fail if Git tag already exists
+        run: |
+          $tag = "v${{ steps.get_version.outputs.VERSION }}"
+          git fetch --tags
+          if (git rev-parse --verify --quiet "$tag") {
+            Write-Error "Tag $tag already exists! You cannot publish the same version twice."
+            exit 1
+          }
+
       - name: Create Public Release and Upload Asset
         uses: softprops/action-gh-release@v1
         env:
@@ -97,6 +108,7 @@ jobs:
           name: Release v${{ steps.get_version.outputs.VERSION }}
           body: |
             ESAF Automation Suite v${{ steps.get_version.outputs.VERSION }}
+
             **First run instructions**:
             1. Run the `.exe`
             2. Go to **Option 1 → Option 7** to generate `esaf_config.json`
