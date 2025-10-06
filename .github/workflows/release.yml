@@ -4,99 +4,120 @@ on:
   push:
     branches: [ Dev ]
   workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Choose release type'
+        type: choice
+        options:
+          - draft
+          - public
+        default: draft
+        required: true
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Read VERSION file
-      id: get_version
-      run: |
-        $version = Get-Content VERSION -Raw
-        $version = $version.Trim()
-        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-        echo "Release version: $version"
+      - name: Read VERSION file
+        id: get_version
+        run: |
+          $version = Get-Content VERSION -Raw
+          $version = $version.Trim()
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Release version: $version"
 
-    - name: Install dependencies
-      run: |
-        pip install pyinstaller
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r requirements.txt
 
-    - name: Verify required files exist
-      run: |
-        $required = @(
-          "autopilot.py",
-          "esaf_automation.py",
-          "merge_and_cleanup.py",
-          "Data_Analysis_Split.py",
-          "summary_pivot.py",
-          "Interactive_Dashboard.py",
-          "complete_process.py",
-          "esaf_config_defaults.json"
-        )
-        foreach ($file in $required) {
-          if (-not (Test-Path $file)) {
-            Write-Error "Missing required file: $file"
+      - name: Verify required files exist
+        run: |
+          $required = @(
+            "autopilot.py",
+            "esaf_automation.py",
+            "merge_and_cleanup.py",
+            "Data_Analysis_Split.py",
+            "summary_pivot.py",
+            "Interactive_Dashboard.py",
+            "complete_process.py",
+            "esaf_config_defaults.json"
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path $file)) {
+              Write-Error "Missing required file: $file"
+              exit 1
+            }
+          }
+          Write-Host "✅ All required files present"
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile --icon="favicon-esaf.ico" --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "pandas" --hidden-import "openpyxl" --hidden-import "plotly" --hidden-import "colorama" --hidden-import "keyboard" --hidden-import "pyautogui" --hidden-import "jinja2" --hidden-import "plotly.graph_objects" --hidden-import "plotly.express" --hidden-import "Pillow" autopilot.py
+
+      - name: Verify .exe was built
+        run: |
+          if (Test-Path "dist\\autopilot.exe") {
+            Write-Host "✅ .exe built successfully"
+          } else {
+            Write-Error "❌ .exe not found in dist folder"
             exit 1
           }
-        }
-        Write-Host "✅ All required files present"
 
-    - name: Build executable with PyInstaller
-      run: |
-       pyinstaller --onefile --icon="favicon-esaf.ico" --add-data "esaf_config_defaults.json;." --add-data "esaf_automation.py;." --add-data "merge_and_cleanup.py;." --add-data "Data_Analysis_Split.py;." --add-data "summary_pivot.py;." --add-data "Interactive_Dashboard.py;." --add-data "complete_process.py;." --hidden-import "pandas" --hidden-import "openpyxl" --hidden-import "plotly" --hidden-import "colorama" --hidden-import "keyboard" --hidden-import "pyautogui" --hidden-import "jinja2" --hidden-import "plotly.graph_objects" --hidden-import "plotly.express" --hidden-import "Pillow" autopilot.py
+      - name: Bundle all scripts and config
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          Copy-Item "*.py" "dist/"
+          Copy-Item "esaf_config_defaults.json" "dist/"
+          Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$version.exe"
+          if (Test-Path "dist\\esaf-automation-v$version.exe") {
+            Write-Host "✅ Final .exe ready: esaf-automation-v$version.exe"
+          } else {
+            Write-Error "❌ Final .exe not found after rename"
+            exit 1
+          }
 
-    - name: Verify .exe was built
-      run: |
-        if (Test-Path "dist\\autopilot.exe") {
-          Write-Host "✅ .exe built successfully"
-        } else {
-          Write-Error "❌ .exe not found in dist folder"
-          exit 1
-        }
+      - name: Upload artifact (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: esaf-automation-exe
+          path: dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
 
-    - name: Bundle all scripts and config
-      run: |
-        $version = "${{ steps.get_version.outputs.VERSION }}"
-        Copy-Item "*.py" "dist/"
-        Copy-Item "esaf_config_defaults.json" "dist/"
-        Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$version.exe"
-        if (Test-Path "dist\\esaf-automation-v$version.exe") {
-          Write-Host "✅ Final .exe ready: esaf-automation-v$version.exe"
-        } else {
-          Write-Error "❌ Final .exe not found after rename"
-          exit 1
-        }
-        
-    - name: Upload artifact (for debugging)
-      uses: actions/upload-artifact@v4
-      with:
-        name: esaf-automation-exe
-        path: dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+      # 🔒 ONLY for PUBLIC: fail if tag already exists
+      - name: Prevent duplicate public release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_type == 'public'
+        run: |
+          $tag = "v${{ steps.get_version.outputs.VERSION }}"
+          git fetch --tags
+          if (git rev-parse --verify --quiet "$tag") {
+            Write-Error "❌ Public release failed: Tag $tag already exists. Bump VERSION file before publishing."
+            exit 1
+          }
 
-    - name: Create Release and Upload Asset
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ steps.get_version.outputs.VERSION }}
-        name: Release v${{ steps.get_version.outputs.VERSION }}
-        body: |
-          ESAF Automation Suite v${{ steps.get_version.outputs.VERSION }}
-          
-          **First run instructions**:
-          1. Run the `.exe`
-          2. Go to **Option 1 → Option 7** to generate `esaf_config.json`
-          3. Then use any option
-        draft: true
-        files: |
-          dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+      - name: Create Release (Draft or Public)
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            🚀 **ESAF Automation Suite v${{ steps.get_version.outputs.VERSION }}**
+
+            💡 **First run instructions**:
+            1. Run the `.exe`
+            2. Go to **Option 1 → Option 7** to generate `esaf_config.json`
+            3. Then use any option
+          draft: ${{ github.event_name == 'push' || (github.event.inputs.release_type == 'draft') }}
+          prerelease: ${{ github.event.inputs.release_type == 'draft' }}
+          files: |
+            dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
