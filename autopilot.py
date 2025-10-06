@@ -396,33 +396,34 @@ def show_menu():
     print(get_ascii_banner())
     print()
     config_status = "[OK] CONFIGURED" if validate_config() else "[ERROR] NOT CONFIGURED"
-    status_line = f"[SYSTEM STATUS: {config_status}]"
+    status_color = Fore.GREEN if validate_config() else Fore.RED
+    status_line = f"[SYSTEM STATUS: {status_color}{config_status}{Fore.RESET}]"
     print(status_line.center(terminal_width))
     print()
     notices = [
-        "[TIP] First-time user? Configure (Option 1) before running full process!",
-        "[WARNING] Press ESC anytime during automation to ABORT immediately!",
-        "[INFO] HCA Healthcare Internal Use Only • v2.1"
+        f"{Fore.CYAN}[TIP] First-time user? Configure (Option 1) before running full process!",
+        f"{Fore.RED}[WARNING] Press ESC anytime during automation to ABORT immediately!",
+        f"{Fore.GREEN}[INFO] HCA Healthcare Internal Use Only • v2.1"
     ]
     for notice in notices:
         print(notice.center(terminal_width))
     print()
-    print(" MAIN OPERATIONS MENU ".center(terminal_width, "="))
+    print(f"{Fore.MAGENTA} MAIN OPERATIONS MENU ".center(terminal_width, "="))
     print()
     menu_items = [
-        "1) Configuration Management",
-        "2) Run FULL End-to-End Process (complete_process.py)",
-        "3) Step 1: ESAF UI Automation (esaf_automation.py)",
-        "4) Step 2: Merge & Cleanup (merge_and_cleanup.py)",
-        "5) Step 3: Assign Requests to Team (Data_Analysis_Split.py)",
-        "6) Step 4: Summary + Pivot (summary_pivot.py)",
-        "7) Step 5: Interactive Dashboard (Interactive_Dashboard.py)",
-        "0) Exit ESAF AutoPilot"
+        f"{Fore.WHITE}1) {Fore.CYAN}Configuration Management",
+        f"{Fore.WHITE}2) {Fore.GREEN}Run FULL End-to-End Process",
+        f"{Fore.WHITE}3) {Fore.MAGENTA}Step 1: ESAF UI Automation",
+        f"{Fore.WHITE}4) {Fore.MAGENTA}Step 2: Merge & Cleanup",
+        f"{Fore.WHITE}5) {Fore.MAGENTA}Step 3: Assign Requests to Team",
+        f"{Fore.WHITE}6) {Fore.MAGENTA}Step 4: Summary + Pivot",
+        f"{Fore.WHITE}7) {Fore.MAGENTA}Step 5: Interactive Dashboard",
+        f"{Fore.WHITE}0) {Fore.RED}Exit ESAF AutoPilot"
     ]
     for item in menu_items:
         print("    " + item)
     print()
-    footer = "ESAF AutoPilot™ • Streamlining Access Request Management"
+    footer = f"{Fore.CYAN}ESAF AutoPilot™ • Streamlining Access Request Management"
     print(footer.center(terminal_width))
 
 def crud_menu():
@@ -430,17 +431,18 @@ def crud_menu():
     config = load_config() or {}
     while True:
         print(f"\n{Fore.CYAN}[CONFIG] CONFIGURATION MANAGEMENT")
-        print("=" * 60)
-        print("0) Edit ESAF URL")
-        print("1) Capture Mouse Coordinates")
-        print("2) Edit Keywords")
-        print("3) Edit Assignees")
-        print("4) Set Downloads Folder")
-        print("5) Edit Queues")
-        print("6) Edit Rules (Thresholds)")
-        print("7) Reset to Defaults")
-        print("8) View Current Config")
-        print("9) Back to Main Menu")
+        print(f"{Fore.CYAN}=" * 60)
+        print(f"{Fore.YELLOW}0) {Fore.CYAN}Edit ESAF URL")
+        print(f"{Fore.YELLOW}1) {Fore.CYAN}Capture Mouse Coordinates")
+        print(f"{Fore.YELLOW}2) {Fore.CYAN}Edit Keywords")
+        print(f"{Fore.YELLOW}3) {Fore.CYAN}Edit Assignees")
+        print(f"{Fore.YELLOW}4) {Fore.CYAN}Set Downloads Folder")
+        print(f"{Fore.YELLOW}5) {Fore.CYAN}Edit Queues")
+        print(f"{Fore.YELLOW}6) {Fore.CYAN}Edit Rules (Thresholds)")
+        print(f"{Fore.YELLOW}7) {Fore.CYAN}Reset to Defaults")
+        print(f"{Fore.YELLOW}8) {Fore.CYAN}View Current Config")
+        print(f"{Fore.YELLOW}9) {Fore.RED}Back to Main Menu")
+        print(f"{Fore.CYAN}=" * 60)
         choice = input(f"{Fore.CYAN}Choose option (0-9): ").strip()
         if choice == "0":
             edit_url(config)
@@ -511,5 +513,3 @@ if __name__ == "__main__":
     init(autoreset=True, convert=True, strip=False)
     main()
 
-
- 

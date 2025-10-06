@@ -9,3 +9,5 @@ Pillow
 keyboard
 colorama
 opencv-python
+jinja2
+
