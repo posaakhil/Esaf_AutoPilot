@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Choose release type'
+        description: 'Release type'
         type: choice
         options:
           - draft
@@ -17,22 +17,49 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write  # Required to push VERSION update and create releases
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Read VERSION file
-        id: get_version
+      - name: Auto-increment version and update VERSION file
+        id: bump_version
         run: |
-          $version = Get-Content VERSION -Raw
-          $version = $version.Trim()
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          echo "Release version: $version"
+          # Read current version
+          $current = Get-Content VERSION -Raw | ForEach-Object { $_.Trim() }
+          Write-Host "Current version: $current"
+
+          # Parse and increment PATCH version (x.y.z -> x.y.(z+1))
+          if ($current -match '^(\d+)\.(\d+)\.(\d+)$') {
+            $major = $matches[1]
+            $minor = $matches[2]
+            $patch = [int]$matches[3] + 1
+            $newVersion = "$major.$minor.$patch"
+          } else {
+            Write-Error "Invalid VERSION format. Expected x.y.z"
+            exit 1
+          }
+
+          # Write new version
+          Set-Content -Path VERSION -Value $newVersion
+          echo "NEW_VERSION=$newVersion" >> $env:GITHUB_OUTPUT
+          Write-Host "Bumped version to: $newVersion"
+
+          # Commit and push the VERSION update
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add VERSION
+          git commit -m "chore: bump version to v$newVersion [skip ci]"
+          git push
 
       - name: Install dependencies
         run: |
@@ -74,7 +101,7 @@ jobs:
 
       - name: Bundle all scripts and config
         run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $version = "${{ steps.bump_version.outputs.NEW_VERSION }}"
           Copy-Item "*.py" "dist/"
           Copy-Item "esaf_config_defaults.json" "dist/"
           Move-Item "dist\\autopilot.exe" "dist\\esaf-automation-v$version.exe"
@@ -89,28 +116,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: esaf-automation-exe
-          path: dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
-
-      # 🔒 Only check for existing tag if doing PUBLIC release
-      - name: Prevent duplicate public release
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_type == 'public'
-        run: |
-          $tag = "v${{ steps.get_version.outputs.VERSION }}"
-          git fetch --tags
-          if (git rev-parse --verify --quiet "$tag") {
-            Write-Error "❌ Cannot publish: Tag $tag already exists. Bump VERSION file."
-            exit 1
-          }
+          path: dist/esaf-automation-v${{ steps.bump_version.outputs.NEW_VERSION }}.exe
 
       - name: Create Release (Draft or Public)
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          name: Release v${{ steps.get_version.outputs.VERSION }}
+          tag_name: v${{ steps.bump_version.outputs.NEW_VERSION }}
+          name: Release v${{ steps.bump_version.outputs.NEW_VERSION }}
           body: |
-            ESAF Automation Suite v${{ steps.get_version.outputs.VERSION }}
+            ESAF Automation Suite v${{ steps.bump_version.outputs.NEW_VERSION }}
             
             **First run instructions**:
             1. Run the `.exe`
@@ -118,4 +134,4 @@ jobs:
             3. Then use any option
           draft: ${{ github.event_name == 'push' || (github.event.inputs.release_type == 'draft') }}
           files: |
-            dist/esaf-automation-v${{ steps.get_version.outputs.VERSION }}.exe
+            dist/esaf-automation-v${{ steps.bump_version.outputs.NEW_VERSION }}.exe
