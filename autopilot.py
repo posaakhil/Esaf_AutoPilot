@@ -412,12 +412,12 @@ def show_menu():
     print()
     menu_items = [
         f"{Fore.WHITE}1) {Fore.CYAN}Configuration Management",
-        f"{Fore.WHITE}2) {Fore.GREEN}Run FULL End-to-End Process (complete_process.py)",
-        f"{Fore.WHITE}3) {Fore.BLUE}Step 1: ESAF UI Automation (esaf_automation.py)",
-        f"{Fore.WHITE}4) {Fore.BLUE}Step 2: Merge & Cleanup (merge_and_cleanup.py)",
-        f"{Fore.WHITE}5) {Fore.BLUE}Step 3: Assign Requests to Team (Data_Analysis_Split.py)",
-        f"{Fore.WHITE}6) {Fore.BLUE}Step 4: Summary + Pivot (summary_pivot.py)",
-        f"{Fore.WHITE}7) {Fore.BLUE}Step 5: Interactive Dashboard (Interactive_Dashboard.py)",
+        f"{Fore.WHITE}2) {Fore.GREEN}Run FULL End-to-End Process",
+        f"{Fore.WHITE}3) {Fore.MAGENTA}Step 1: ESAF UI Automation",
+        f"{Fore.WHITE}4) {Fore.MAGENTA}Step 2: Merge & Cleanup",
+        f"{Fore.WHITE}5) {Fore.MAGENTA}Step 3: Assign Requests to Team",
+        f"{Fore.WHITE}6) {Fore.MAGENTA}Step 4: Summary + Pivot",
+        f"{Fore.WHITE}7) {Fore.MAGENTA}Step 5: Interactive Dashboard",
         f"{Fore.WHITE}0) {Fore.RED}Exit ESAF AutoPilot"
     ]
     for item in menu_items:
@@ -512,3 +512,4 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding='utf-8')
     init(autoreset=True, convert=True, strip=False)
     main()
+
