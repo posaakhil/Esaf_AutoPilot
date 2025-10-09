@@ -14,7 +14,7 @@ Automated end-to-end solution for HCA Healthcare's ESAF access request processin
 3. Run full process or step-by-step
 
 ## 📦 Requirements
-- Python 3.8+
+- Python 3.10+
 - Dependencies: `pandas`, `openpyxl`, `plotly`, `pyautogui`, `keyboard`, `colorama`, `pyperclip`
 
 ## 🧭 User Provisioning Guide
@@ -23,4 +23,5 @@ Automated end-to-end solution for HCA Healthcare's ESAF access request processin
 
 
 > **Internal Use Only — HCA Healthcare**
+
 
