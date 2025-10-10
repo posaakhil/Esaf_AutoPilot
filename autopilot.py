@@ -403,7 +403,7 @@ def show_menu():
     notices = [
         f"{Fore.CYAN}[TIP] First-time user? Configure (Option 1) before running full process!",
         f"{Fore.RED}[WARNING] Press ESC anytime during automation to ABORT immediately!",
-        f"{Fore.GREEN}[INFO] HCA Healthcare Internal Use Only • v2.1"
+        f"{Fore.GREEN}[INFO] HCA Healthcare Internal Use Only •"
     ]
     for notice in notices:
         print(notice.center(terminal_width))
@@ -512,4 +512,5 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding='utf-8')
     init(autoreset=True, convert=True, strip=False)
     main()
+
 
