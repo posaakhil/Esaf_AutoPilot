@@ -46,7 +46,7 @@
     "max_per_person_meditech": 5,
     "requests_per_app_domestic": 2,
     "india_keyword": "CORP-ACCESS-INDIA",
-    "meditech_keyword": "MEDITECH_Expanse_CAP_Panhandle_Market"
+    "meditech_keyword": "MEDITECH"
   },
   "output_file": "Today_Assignment.xlsx",
   "keep_columns": [
@@ -65,4 +65,5 @@
   },
   "no_requests_text": "There are no requests available",
   "base_assignment_folder": "assignment_"
+
 }
